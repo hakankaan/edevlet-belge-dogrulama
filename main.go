@@ -40,4 +40,5 @@ func main() {
 	InfoLogger.Println("Starting...")
 	InfoLogger.Printf("Citizen id: %s\n", *id)
 	InfoLogger.Printf("Barcode: %s\n", *barcode)
+
 }

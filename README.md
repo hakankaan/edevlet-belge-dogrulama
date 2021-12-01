@@ -1,0 +1,1 @@
+# edevlet-belge-dogrulama

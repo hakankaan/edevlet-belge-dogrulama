@@ -42,7 +42,7 @@ func main() {
 	InfoLogger.Printf("Citizen id: %s\n", *id)
 	InfoLogger.Printf("Barcode: %s\n", *barcode)
 
-	d := document{
+	d := Document{
 		ID:      *id,
 		Barcode: *barcode,
 	}
@@ -65,5 +65,11 @@ func main() {
 	if err := d.AcceptForm(); err != nil {
 		ErrorLogger.Println(err)
 		os.Exit(1)
+	}
+
+	if d.IsValid {
+		InfoLogger.Println("Document is valid")
+	} else {
+		ErrorLogger.Println("Document is invalid")
 	}
 }

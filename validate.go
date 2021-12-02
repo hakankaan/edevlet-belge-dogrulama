@@ -1,13 +1,13 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -17,11 +17,12 @@ var (
 
 const eDevletURL = "https://turkiye.gov.tr"
 
-type document struct {
+type Document struct {
 	Barcode string
 	ID      string
 	Token   string
 	Cookies []*http.Cookie
+	IsValid bool
 }
 
 func init() {
@@ -32,95 +33,75 @@ func init() {
 }
 
 // getToken gets the first token from the e-devlet website
-func (d document) GetToken() error {
+func (d *Document) GetToken() error {
 	InfoLogger.Println("Getting token...")
-	body, err := d.makeRequest(http.MethodGet, "/belge-dogrulama", nil)
+
+	data := url.Values{}
+
+	body, err := d.makeRequest(http.MethodGet, "/belge-dogrulama", strings.NewReader(data.Encode()))
 	if err != nil {
 		return err
 	}
 	d.Token = extractToken(body)
-	InfoLogger.Println("Token:", d.Token)
 	return nil
 }
 
 // InsertBarcode inserts the barcode into the barcode form then gets the new token for next form
-func (d document) InsertBarcode() error {
+func (d *Document) InsertBarcode() error {
 	InfoLogger.Println("Inserting barcode...")
-	requestBody, err := json.Marshal(map[string]string{
-		"sorgulananBarkod": d.Barcode,
-		"token":            d.Token,
-		"btn":              "Devam Et",
-	})
-	if err != nil {
-		return err
-	}
-	body, err := d.makeRequest(http.MethodPost, "/belge-dogrulama?submit", bytes.NewBuffer(requestBody))
+
+	data := url.Values{}
+	data.Set("sorgulananBarkod", d.Barcode)
+	data.Set("token", d.Token)
+
+	body, err := d.makeRequest(http.MethodPost, "/belge-dogrulama?submit", strings.NewReader(data.Encode()))
 	if err != nil {
 		return err
 	}
 	d.Token = extractToken(body)
-	InfoLogger.Println("Token:", d.Token)
-	// InfoLogger.Println(body)
 	return nil
 }
 
 // InsertID inserts the citizen id into the citizen id form then gets the new token for next form
-func (d document) InsertID() error {
+func (d *Document) InsertID() error {
 	InfoLogger.Println("Inserting ID...")
-	requestBody, err := json.Marshal(map[string]string{
-		"ikinciAlan": d.ID,
-		"token":      d.Token,
-		"btn":        "Devam Et",
-	})
-	if err != nil {
-		return err
-	}
+	data := url.Values{}
+	data.Set("ikinciAlan", d.ID)
+	data.Set("token", d.Token)
+	data.Set("btn", "Devam Et")
 
-	body, err := d.makeRequest(http.MethodPost, "/belge-dogrulama?islem=dogrulama&submit", bytes.NewBuffer(requestBody))
+	body, err := d.makeRequest(http.MethodPost, "/belge-dogrulama?islem=dogrulama&submit", strings.NewReader(data.Encode()))
 	if err != nil {
 		return err
 	}
 	d.Token = extractToken(body)
-	InfoLogger.Println("Token:", d.Token)
 	return nil
 }
 
 // AcceptForm accepts the agreements and returns result of validation
-func (d document) AcceptForm() error {
+func (d *Document) AcceptForm() error {
 	InfoLogger.Println("Acceptin form...")
-	requestBody, err := json.Marshal(map[string]interface{}{
-		"chkOnay": 1,
-		"token":   d.Token,
-		"btn":     "Devam Et",
-	})
+	data := url.Values{}
+	data.Set("chkOnay", "1")
+	data.Set("token", d.Token)
+
+	body, err := d.makeRequest(http.MethodPost, "/belge-dogrulama?islem=onay&submit", strings.NewReader(data.Encode()))
 	if err != nil {
 		return err
 	}
-
-	_, requestErr := d.makeRequest(http.MethodPost, "/belge-dogrulama?islem=onay&submit", bytes.NewBuffer(requestBody))
-	if requestErr != nil {
-		return requestErr
-	}
-	// InfoLogger.Println(body)
+	d.IsValid = checkForPdfLink(body)
 	return nil
 }
 
-// extractToken extracts the token from the given html body
-func extractToken(body string) string {
-	re := regexp.MustCompile(`data-token="\{([^}]*)\}`)
-	match := re.FindStringSubmatch(body)
-	return fmt.Sprintf("{%s}", match[1])
-}
-
 // makeRequest makes a request to the given url and returns the response body
-func (d document) makeRequest(method string, path string, body io.Reader) (string, error) {
+func (d *Document) makeRequest(method string, path string, body io.Reader) (string, error) {
 	req, err := http.NewRequest(method, fmt.Sprintf("%s%s", eDevletURL, path), body)
 
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/95.0.4638.69 Safari/537.36")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	for _, cookie := range d.Cookies {
 		req.AddCookie(cookie)
@@ -128,10 +109,10 @@ func (d document) makeRequest(method string, path string, body io.Reader) (strin
 
 	resp, err := client.Do(req)
 
-	d.Cookies = resp.Cookies()
+	respCookies := resp.Cookies()
 
-	for _, cookie := range req.Cookies() {
-		InfoLogger.Println("Cookie:", cookie)
+	if len(d.Cookies) == 0 && len(respCookies) != 1 {
+		d.Cookies = respCookies
 	}
 
 	if err != nil {
@@ -147,4 +128,15 @@ func (d document) makeRequest(method string, path string, body io.Reader) (strin
 	}
 
 	return string(bodyBytes), nil
+}
+
+// extractToken extracts the token from the given html body
+func extractToken(body string) string {
+	re := regexp.MustCompile(`data-token="\{([^}]*)\}`)
+	match := re.FindStringSubmatch(body)
+	return fmt.Sprintf("{%s}", match[1])
+}
+
+func checkForPdfLink(body string) bool {
+	return strings.Contains(body, "/belge-dogrulama?belge=goster&goster=1")
 }

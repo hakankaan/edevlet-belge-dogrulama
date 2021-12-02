@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log"
+	"os"
 )
 
 const (
@@ -21,7 +22,7 @@ var (
 
 func init() {
 	// Init logger
-	InfoLogger = log.New(log.Writer(), "INFO: ", log.Ldate|log.Ltime|log.Lshortfile)
+	InfoLogger = log.New(log.Writer(), "INFO: ", log.Ldate|log.Ltime)
 	ErrorLogger = log.New(log.Writer(), "ERROR: ", log.Ldate|log.Ltime|log.Lshortfile)
 
 	// Init args
@@ -41,4 +42,28 @@ func main() {
 	InfoLogger.Printf("Citizen id: %s\n", *id)
 	InfoLogger.Printf("Barcode: %s\n", *barcode)
 
+	d := document{
+		ID:      *id,
+		Barcode: *barcode,
+	}
+
+	if err := d.GetToken(); err != nil {
+		ErrorLogger.Println(err)
+		os.Exit(1)
+	}
+
+	if err := d.InsertBarcode(); err != nil {
+		ErrorLogger.Println(err)
+		os.Exit(1)
+	}
+
+	if err := d.InsertID(); err != nil {
+		ErrorLogger.Println(err)
+		os.Exit(1)
+	}
+
+	if err := d.AcceptForm(); err != nil {
+		ErrorLogger.Println(err)
+		os.Exit(1)
+	}
 }

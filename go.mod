@@ -1,3 +1,3 @@
-module edevlet-belge-dogrulama
+module belge-dogrulama
 
 go 1.17

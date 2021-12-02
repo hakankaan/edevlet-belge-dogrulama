@@ -15,7 +15,7 @@ var (
 	client http.Client
 )
 
-const eDevletURL = "https://turkiye.gov.tx"
+const eDevletURL = "https://turkiye.gov.tr"
 
 type Document struct {
 	Barcode string

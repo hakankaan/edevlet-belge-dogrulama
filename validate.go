@@ -15,7 +15,7 @@ var (
 	client http.Client
 )
 
-const eDevletURL = "https://turkiye.gov.tr"
+const eDevletURL = "https://turkiye.gov.tx"
 
 type Document struct {
 	Barcode string
@@ -108,6 +108,10 @@ func (d *Document) makeRequest(method string, path string, body io.Reader) (stri
 	}
 
 	resp, err := client.Do(req)
+
+	if err != nil {
+		return "", err
+	}
 
 	respCookies := resp.Cookies()
 

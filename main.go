@@ -1,6 +1,7 @@
 package main
 
 import (
+	"belge-dogrulama/document"
 	"flag"
 	"log"
 	"os"
@@ -42,10 +43,7 @@ func main() {
 	InfoLogger.Printf("Citizen id: %s\n", *id)
 	InfoLogger.Printf("Barcode: %s\n", *barcode)
 
-	d := Document{
-		ID:      *id,
-		Barcode: *barcode,
-	}
+	d := document.New(*barcode, *id, InfoLogger)
 
 	if err := d.GetToken(); err != nil {
 		ErrorLogger.Println(err)

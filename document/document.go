@@ -1,9 +1,10 @@
-package main
+package document
 
 import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -18,11 +19,12 @@ var (
 const eDevletURL = "https://turkiye.gov.tr"
 
 type Document struct {
-	Barcode string
-	ID      string
-	Token   string
-	Cookies []*http.Cookie
-	IsValid bool
+	Barcode    string
+	ID         string
+	Token      string
+	InfoLogger *log.Logger
+	Cookies    []*http.Cookie
+	IsValid    bool
 }
 
 func init() {
@@ -32,9 +34,17 @@ func init() {
 
 }
 
+func New(barcode string, id string, InfoLogger *log.Logger) *Document {
+	return &Document{
+		Barcode:    barcode,
+		ID:         id,
+		InfoLogger: InfoLogger,
+	}
+}
+
 // getToken gets the first token from the e-devlet website
 func (d *Document) GetToken() error {
-	InfoLogger.Println("Getting token...")
+	d.InfoLogger.Println("Getting token...")
 
 	data := url.Values{}
 
@@ -48,7 +58,7 @@ func (d *Document) GetToken() error {
 
 // InsertBarcode inserts the barcode into the barcode form then gets the new token for next form
 func (d *Document) InsertBarcode() error {
-	InfoLogger.Println("Inserting barcode...")
+	d.InfoLogger.Println("Inserting barcode...")
 
 	data := url.Values{}
 	data.Set("sorgulananBarkod", d.Barcode)
@@ -64,7 +74,7 @@ func (d *Document) InsertBarcode() error {
 
 // InsertID inserts the citizen id into the citizen id form then gets the new token for next form
 func (d *Document) InsertID() error {
-	InfoLogger.Println("Inserting ID...")
+	d.InfoLogger.Println("Inserting ID...")
 	data := url.Values{}
 	data.Set("ikinciAlan", d.ID)
 	data.Set("token", d.Token)
@@ -80,7 +90,7 @@ func (d *Document) InsertID() error {
 
 // AcceptForm accepts the agreements and returns result of validation
 func (d *Document) AcceptForm() error {
-	InfoLogger.Println("Acceptin form...")
+	d.InfoLogger.Println("Acceptin form...")
 	data := url.Values{}
 	data.Set("chkOnay", "1")
 	data.Set("token", d.Token)
